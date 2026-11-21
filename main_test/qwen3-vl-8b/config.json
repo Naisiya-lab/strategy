@@ -1,0 +1,13 @@
+{
+  "data_root": "/nc1test1/lwj/data/MMTab_eval",
+  "annotation": "MMTab-eval_test_data_49K.json",
+  "model_path": "/nc1test1/lwj/Models/Qwen3-VL-8B-Instruct",
+  "served_model": "qwen3-vl-8b",
+  "endpoints": ["http://127.0.0.1:8100/v1", "http://127.0.0.1:8101/v1", "http://127.0.0.1:8102/v1", "http://127.0.0.1:8103/v1"],
+  "concurrency_per_endpoint": 8,
+  "max_tokens": 8192,
+  "temperature": 0,
+  "seed": 42,
+  "timeout_seconds": 900,
+  "transport_retries": 2
+}
