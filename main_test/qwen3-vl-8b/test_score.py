@@ -11,6 +11,16 @@ score=importlib.util.module_from_spec(spec);spec.loader.exec_module(score)
 
 
 class ScoreTest(unittest.TestCase):
+    def test_teds_format_denominators(self):
+        kinds={'a':'HTML','b':'HTML','c':'Markdown','d':'Latex'}
+        gold={k:{'original_query_type':'table recognition with '+v} for k,v in kinds.items()}
+        results={k:{'score':1.,'error':None} for k in kinds}
+        results['b']={'score':0.,'error':'No HTML table'}
+        metrics, groups=score.aggregate_teds([{'question_id':k} for k in kinds],gold,results)
+        self.assertEqual(metrics,{'HTML_TEDS':0.5,'Markdown_TEDS':1.,'LaTeX_TEDS':1.})
+        self.assertEqual(groups['HTML']['n'],2)
+        self.assertEqual(groups['HTML']['parse_or_compute_errors'],1)
+
     def test_source_hash_accepts_line_endings_rejects_edits(self):
         original=(score.OFFICIAL/'MMTab_evaluation.ipynb').read_bytes().replace(b'\r\n',b'\n')
         with tempfile.TemporaryDirectory() as tmp:

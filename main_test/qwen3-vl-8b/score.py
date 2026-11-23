@@ -106,6 +106,22 @@ def teds_one(job):
         return sid, {'score':0., 'error':type(exc).__name__+': '+str(exc)}
 
 
+def aggregate_teds(items, gold, results):
+    groups = defaultdict(list)
+    for row in items:
+        sid = row['question_id']
+        kind = gold[sid]['original_query_type'].lower()
+        fmt = 'HTML' if 'html' in kind else 'LaTeX' if 'latex' in kind else 'Markdown'
+        groups[fmt].append(results[sid])
+    breakdown = {fmt: {'n': len(values),
+                       'parse_or_compute_errors': sum(bool(v['error']) for v in values),
+                       'teds': sum(v['score'] for v in values)/len(values)}
+                 for fmt, values in groups.items()}
+    metrics = {fmt+'_TEDS': breakdown[fmt]['teds']
+               for fmt in ('HTML', 'Markdown', 'LaTeX') if fmt in breakdown}
+    return metrics, breakdown
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--run',type=Path,default=ROOT/'outputs/full')
@@ -158,7 +174,8 @@ def main():
                 for sid,value in pool.map(teds_one,todo,chunksize=1):
                     results[sid]=value; write(paths[sid],value)
                     if len(results)%100==0: print('TEDS',len(results),'/',len(items),flush=True)
-            report['metrics']={'TEDS_all_samples':sum(v['score'] for v in results.values())/len(items)}
+            report['metrics'], report['format_breakdown'] = aggregate_teds(items,gold,results)
+            report['TEDS_all_samples']=sum(v['score'] for v in results.values())/len(items)
             report['teds_parse_or_compute_errors']=sum(bool(v['error']) for v in results.values())
             report['scoring_error']=None
             write(out/'teds_per_sample.json',results)
@@ -177,6 +194,16 @@ def main():
     for r in reports:
         values='; '.join(f'{k}={v:.6f}' for k,v in r['metrics'].items()) or '—'
         lines.append(f"| {r['task']} | {r['benchmark']} | {r['n']} | {r['execution_errors']} | {r['truncated']} | {values} | {r.get('scoring_error') or ''} |")
+    for report in reports:
+        if report['task'] == 'TR':
+            formats = report['format_breakdown']
+            order = ('HTML', 'Markdown', 'LaTeX')
+            lines += ['', '## TR by output format', '',
+                      '| HTML TEDS | Markdown TEDS | LaTeX TEDS |', '|---:|---:|---:|',
+                      '| '+' | '.join(f"{formats[f]['teds']:.6f}" if f in formats else '—' for f in order)+' |',
+                      '', '| Format | N | Parse/compute failures |', '|---|---:|---:|']
+            lines += [f"| {f} | {formats[f]['n']} | {formats[f]['parse_or_compute_errors']} |"
+                      for f in order if f in formats]
     (out/'METRICS.md').write_text('\n'.join(lines)+'\n',encoding='utf-8')
     print('Saved:',out/'METRICS.md',flush=True)
 
