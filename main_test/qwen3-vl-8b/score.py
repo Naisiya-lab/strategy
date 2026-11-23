@@ -15,7 +15,9 @@ import warnings
 
 ROOT = Path(__file__).resolve().parent
 OFFICIAL = ROOT/'scoring_source'
-NOTEBOOK_HASH = '46fba85fc1661ea97bc1e63d306bded71175a0ea5bf55d9bf727d1749b392112'
+# Hash the frozen source after CRLF -> LF normalization. Git normalizes text
+# on Windows/Linux; verify content without treating line endings as edits.
+NOTEBOOK_HASH = '81b8a5fc48a11fc06d699833c94715b075e015f92b383558f70d1fe41d659aca'
 
 
 def sha(b): return hashlib.sha256(b).hexdigest()
@@ -32,7 +34,7 @@ def write(p, value):
 @lru_cache(maxsize=1)
 def functions():
     data = (OFFICIAL/'MMTab_evaluation.ipynb').read_bytes()
-    if sha(data) != NOTEBOOK_HASH:
+    if sha(data.replace(b'\r\n', b'\n')) != NOTEBOOK_HASH:
         raise ValueError('Scoring notebook hash changed')
     nb = json.loads(data)
     nodes = []

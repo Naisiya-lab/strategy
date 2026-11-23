@@ -11,6 +11,21 @@ score=importlib.util.module_from_spec(spec);spec.loader.exec_module(score)
 
 
 class ScoreTest(unittest.TestCase):
+    def test_source_hash_accepts_line_endings_rejects_edits(self):
+        original=(score.OFFICIAL/'MMTab_evaluation.ipynb').read_bytes().replace(b'\r\n',b'\n')
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); p=root/'MMTab_evaluation.ipynb'
+            with patch.object(score,'OFFICIAL',root):
+                try:
+                    for content in (original, original.replace(b'\n',b'\r\n')):
+                        p.write_bytes(content);score.functions.cache_clear()
+                        self.assertIn('evaluate_mcd_questions',score.functions())
+                    p.write_bytes(original+b' ');score.functions.cache_clear()
+                    with self.assertRaisesRegex(ValueError,'hash changed'):
+                        score.functions()
+                finally:
+                    score.functions.cache_clear()
+
     def test_qa_failure_keeps_denominator(self):
         gold={str(i):{'item_id':str(i),'answer_list':['42']} for i in range(2)}
         result=score.official_group('TQA','WTQ',[

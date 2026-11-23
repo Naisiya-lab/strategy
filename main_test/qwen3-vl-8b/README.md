@@ -128,6 +128,7 @@ TR较慢，可以重跑同一评分命令复用缓存。预测读取samples原�
 全量运行会额外检查样本ID集合与全部官方标注相同，且核验标注哈希。
 
 指标：TQA/TFV按来源子集Accuracy，FeTaQA/T2T按来源corpus BLEU，TSD行列Accuracy，TCE/TCL单元格Accuracy，MCD F1，RCE行列P/R/F1，TR TEDS。
+评分notebook校验统一CRLF/LF换行后计算哈希，允许Git跨平台换行转换，仍拒绝其他内容修改。
 Accuracy/F1/TEDS为0–1，BLEU为0–100，不混算总准确率。来源代码和依赖版本记录到metrics.json。
 ToTTo官方测试参考缺失，不伪造本地指标。TR沿用项目已有转换，并以全部选定样本为分母，转换/计算失败记0。
 其余官方函数保留原公式，包括RCE对未解析目标的计数局限；分母不是统一的整题数。
