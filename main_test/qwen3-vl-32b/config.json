@@ -1,0 +1,29 @@
+{
+  "data_root": "/nc1test1/lwj/data/MMTab_eval",
+  "annotation": "MMTab-eval_test_data_49K.json",
+  "model_path": "/nc1test1/lwj/Models/Qwen3-VL-32B-Instruct",
+  "served_model": "qwen3-vl-32b",
+  "endpoints": [
+    "http://127.0.0.1:8200/v1",
+    "http://127.0.0.1:8201/v1"
+  ],
+  "concurrency_per_endpoint": 8,
+  "server_max_model_len": 32768,
+  "max_tokens": 8192,
+  "temperature": 0,
+  "seed": 42,
+  "timeout_seconds": 900,
+  "transport_retries": 2,
+  "gpu_groups": [
+    "0,1",
+    "2,3"
+  ],
+  "internal_ports": [
+    54000,
+    54200
+  ],
+  "tensor_parallel_size": 2,
+  "max_num_seqs": 8,
+  "max_num_batched_tokens": 8192,
+  "gpu_memory_utilization": 0.9
+}
