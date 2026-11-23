@@ -13,6 +13,25 @@ spec.loader.exec_module(ev)
 
 
 class IntegrationTest(unittest.TestCase):
+    def test_dotted_ids_and_explicit_image_suffix(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);(root/'images').mkdir()
+            name='TabFact_2-10689762-4.html.csv'
+            (root/'images'/(name+'.jpg')).write_bytes(b'image')
+            (root/'images'/'plain.png').write_bytes(b'image2')
+            rows=[{'item_id':str(i),'image_id':iid,'input':'question',
+                   'task_type':'TFV','dataset_name':'TabFact'}
+                  for i,iid in enumerate([name,name+'.jpg','plain'])]
+            (root/'ann.json').write_text(json.dumps(rows))
+            cfg={'data_root':str(root),'annotation':'ann.json'}
+            prepared,_=ev.prepare(cfg,'check',4)
+            self.assertEqual(len(prepared),3)
+            self.assertEqual(Path(prepared[0]['image']).name,name+'.jpg')
+            self.assertEqual(prepared[0]['image'],prepared[1]['image'])
+            (root/'images'/(name+'.png')).write_bytes(b'ambiguous')
+            with self.assertRaisesRegex(ValueError,'found 2'):
+                ev.prepare(cfg,'check',4)
+
     def test_http_resume_export_and_manifest_guard(self):
         seen = []
         def mock_open(req, timeout):

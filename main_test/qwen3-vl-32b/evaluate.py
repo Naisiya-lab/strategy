@@ -68,7 +68,12 @@ def prepare(cfg, mode, per_group):
     prepared = []
     for r in rows:
         iid = str(r['image_id'])
-        matches = index.get(Path(iid).stem, [])
+        # IDs such as TabFact_*.html.csv are opaque identifiers. Only strip
+        # actual image suffixes, never .csv/.html components of an ID.
+        image_name = Path(iid).name
+        key = Path(image_name).stem if Path(image_name).suffix.lower() in {
+            '.jpg', '.jpeg', '.png', '.webp', '.bmp'} else image_name
+        matches = index.get(key, [])
         if len(matches) != 1:
             raise ValueError(f'Image {iid}: expected exactly one file, found {len(matches)}')
         p = matches[0]
