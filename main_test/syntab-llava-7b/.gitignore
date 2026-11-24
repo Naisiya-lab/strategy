@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+logs/
+outputs/
+vendor/
+prepared_model/
