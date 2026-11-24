@@ -73,6 +73,11 @@ class ScoreTest(unittest.TestCase):
             self.assertTrue(result['complete'])
             self.assertEqual(result['groups'][0]['metrics']['Accuracy'],1.0)
             self.assertEqual(result['groups'][0]['truncated'],1)
+            before=(run/'metrics/metrics.json').read_bytes()
+            with patch.object(sys,'argv',args+['--report-only']), patch.object(score,'official_group',side_effect=AssertionError('must not rescore')):
+                score.main()
+            self.assertEqual((run/'metrics/metrics.json').read_bytes(),before)
+            self.assertTrue((run/'metrics/SUMMARY.tsv').exists())
 
 
 if __name__=='__main__':unittest.main()

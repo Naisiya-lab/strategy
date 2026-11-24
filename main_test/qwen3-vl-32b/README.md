@@ -66,12 +66,21 @@ Ctrl+C退出tail不会停止服务。启动进程退出但遗留子进程时，s
 bash install_score.sh
 bash score.sh
 cat outputs/full/metrics/METRICS.md
+# 已算完指标时，仅调整排列，不重算TEDS：
+bash score.sh --report-only
 ```
 
 沿用8B相同的冻结官方函数与TEDS转换、校验修复，不调用API。TQA/TFV按来源子集，结构任务按任务分别计分。
 TR报告HTML TEDS、Markdown TEDS、LaTeX TEDS，各自以该格式全部样本为分母，转换失败记0。
 BLEU为0–100，其余Accuracy/F1/TEDS为0–1，不混成一个总准确率。
 RCE保留官方未解析目标计数局限；评分异常写入scoring_error。ToTTo不伪造缺失参考答案的本地分数。
+
+结果按指定截图顺序固定输出：TQA的TABMWP、WTQ、HiTab、TAT-QA、FeTaQA、AIT-QA、TabMCQ；
+TFV的TabFact、InfoTabs、PubHealthTab；T2T的ToTTo、HiTab_T2T、Rotowire、WikiBIO；
+然后TSD行/列、TSD_OOD行/列、TCE、TCE_OOD、TCL、TCL_OOD、MCD、RCE行/列、RCE_OOD行/列、HTML/Markdown/LaTeX TEDS。
+METRICS.md包含前后两张横向表。SUMMARY.tsv提供同序30项指标，另有TQA_TFV_T2T.tsv和TSU_TR.tsv便于分别复制。
+展示表中的Acc/F1/TEDS为百分数并保留2位小数，BLEU保持0–100并保留6位小数；metrics.json原值不变。
+缺失/不可用/评分异常显示“—”，不冒充0；真实零分显示0.00%。仅改变汇报方式，不改变8B已有的评分公式。
 
 ## 本地验证
 
