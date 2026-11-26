@@ -63,3 +63,10 @@ bash score.sh --run outputs/smoke
 评分与Qwen相同，报告同序30项指标及HTML、Markdown、LaTeX三种TEDS。
 METRICS.md及SUMMARY.tsv位于各运行目录metrics下。评分失败和缺失项不冒充0分，ToTTo不伪造本地分数。
 README只说明预期运行方式；原始模型真实四卡加载尚未在机器2验证。
+
+
+## 2026-11-26 评分更新
+
+默认 `bash score.sh` 使用策略进化V2规范化口径，结果写入 `metrics_normalized/`。
+原始口径使用 `bash score.sh --normalization raw`，仍写入 `metrics/`。
+规则、输出和小批评分命令见 [NORMALIZATION.md](NORMALIZATION.md)。

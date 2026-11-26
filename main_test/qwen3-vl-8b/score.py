@@ -12,6 +12,8 @@ from pathlib import Path
 import re
 import sys
 import warnings
+from report import group_order, write_report
+import normalization
 
 ROOT = Path(__file__).resolve().parent
 OFFICIAL = ROOT/'scoring_source'
@@ -126,10 +128,22 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--run',type=Path,default=ROOT/'outputs/full')
     ap.add_argument('--data-root',type=Path)
+    ap.add_argument('--normalization', choices=('v2', 'raw'), default='v2',
+                    help='V2 symmetric representation rules (default), or untouched official scoring')
     ap.add_argument('--workers',type=int,default=4)
+    ap.add_argument('--report-only',action='store_true',help='Reformat existing complete metrics.json without recomputing scores')
     args=ap.parse_args()
     if args.workers<1: ap.error('workers must be positive')
     run=args.run.resolve(); manifest=read(run/'manifest.json')
+    metric_dir = 'metrics_normalized' if args.normalization == 'v2' else 'metrics'
+    if args.report_only:
+        saved=read(run/metric_dir/'metrics.json')
+        if not saved.get('complete'): raise ValueError('Metrics are incomplete; cannot report-only')
+        if saved['provenance']['manifest_sha256'] != sha((run/'manifest.json').read_bytes()):
+            raise ValueError('Metrics do not belong to this manifest')
+        write_report(saved['groups'],run/metric_dir)
+        print('Saved:',run/metric_dir/'METRICS.md')
+        return
     data=args.data_root or Path(manifest['config']['data_root'])
     ann=data/manifest['config']['annotation']; raw=ann.read_bytes()
     if sha(raw)!=manifest['annotation_sha256']: raise ValueError('Annotation differs from run')
@@ -152,13 +166,25 @@ def main():
     provenance={'manifest_sha256':sha((run/'manifest.json').read_bytes()),'sources':source_hashes,
                 'script_sha256':sha(Path(__file__).read_bytes()),
                 'dependencies':{k:version(k) for k in ('sacrebleu','apted','Distance','lxml','tqdm')}}
-    out=run/'metrics'; out.mkdir(exist_ok=True)
+    out=run/metric_dir; out.mkdir(exist_ok=True)
     reports=[]
-    for (task,benchmark),items in sorted(groups.items()):
+    audits=[]
+    provenance['annotation_sha256'] = sha(raw)
+    provenance['tables_sha256'] = sha((data/'MMTab-eval_test_tables_23K.json').read_bytes())
+    provenance['predictions_sha256'] = sha(json.dumps(predictions,sort_keys=True,ensure_ascii=False).encode())
+    provenance['normalization'] = args.normalization
+    provenance['normalizer_version'] = normalization.VERSION if args.normalization == 'v2' else None
+    provenance['normalizer_sha256'] = sha(Path(normalization.__file__).read_bytes())
+    provenance['normalization_sources'] = normalization.SOURCE_SHA256
+    provenance['bleu_lowercase'] = False
+    for (task,benchmark),items in sorted(groups.items(),key=lambda pair:group_order(pair[0])):
         print('Scoring',task,benchmark,len(items),flush=True)
         report={'task':task,'benchmark':benchmark,'n':len(items),
                 'execution_errors':sum(states[r['question_id']]['status']!='ok' for r in items),
                 'truncated':sum(states[r['question_id']]['finish_reason']=='length' for r in items)}
+        if args.normalization == 'v2':
+            normalized, refs, source_tables, detail = normalization.normalize_group(task,benchmark,items,gold,tables)
+            audits.extend(detail)
         if benchmark=='ToTTo':
             report.update(metrics={},scoring_error='ToTTo test references unavailable; official external evaluation required')
         elif task=='TR':
@@ -180,31 +206,16 @@ def main():
             report['scoring_error']=None
             write(out/'teds_per_sample.json',results)
         else:
-            report.update(official_group(task,benchmark,items,gold,tables))
+            if args.normalization == 'v2':
+                report.update(official_group(task,benchmark,normalized,refs,source_tables))
+            else:
+                report.update(official_group(task,benchmark,items,gold,tables))
         reports.append(report)
         write(out/'metrics.json',{'provenance':provenance,'groups':reports,'complete':False})
     write(out/'metrics.json',{'provenance':provenance,'groups':reports,'complete':True})
-    lines=['# Qwen3-VL-8B MMTab-eval metrics','',
-           'Accuracy/F1/TEDS use 0–1; corpus BLEU uses 0–100. No mixed overall accuracy.',
-           'TR retains all selected samples in denominator; parse/compute failures score zero.',
-           'Other tasks use frozen official notebook formulas, including their parsing/denominator limitations.',
-           'RCE official F1 may ignore unparsed targets or raise division by zero; see official_log/scoring_error in JSON.',
-           '', '| Task | Subset | N | Execution errors | Truncated | Metrics | Scoring note |',
-           '|---|---|---:|---:|---:|---|---|']
-    for r in reports:
-        values='; '.join(f'{k}={v:.6f}' for k,v in r['metrics'].items()) or '—'
-        lines.append(f"| {r['task']} | {r['benchmark']} | {r['n']} | {r['execution_errors']} | {r['truncated']} | {values} | {r.get('scoring_error') or ''} |")
-    for report in reports:
-        if report['task'] == 'TR':
-            formats = report['format_breakdown']
-            order = ('HTML', 'Markdown', 'LaTeX')
-            lines += ['', '## TR by output format', '',
-                      '| HTML TEDS | Markdown TEDS | LaTeX TEDS |', '|---:|---:|---:|',
-                      '| '+' | '.join(f"{formats[f]['teds']:.6f}" if f in formats else '—' for f in order)+' |',
-                      '', '| Format | N | Parse/compute failures |', '|---|---:|---:|']
-            lines += [f"| {f} | {formats[f]['n']} | {formats[f]['parse_or_compute_errors']} |"
-                      for f in order if f in formats]
-    (out/'METRICS.md').write_text('\n'.join(lines)+'\n',encoding='utf-8')
+    if args.normalization == 'v2':
+        write(out/'normalization_detail.json', audits)
+    write_report(reports,out)
     print('Saved:',out/'METRICS.md',flush=True)
 
 

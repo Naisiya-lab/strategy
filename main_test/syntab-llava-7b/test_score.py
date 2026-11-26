@@ -69,15 +69,15 @@ class ScoreTest(unittest.TestCase):
                 (run/'samples'/(score.sha(b'a')+'.json')).write_text(json.dumps({
                     'id':'a','status':'ok','answer':'{"answer": ["42"]}','finish_reason':'length'}))
                 score.main()
-            result=json.loads((run/'metrics/metrics.json').read_text())
+            result=json.loads((run/'metrics_normalized/metrics.json').read_text())
             self.assertTrue(result['complete'])
             self.assertEqual(result['groups'][0]['metrics']['Accuracy'],1.0)
             self.assertEqual(result['groups'][0]['truncated'],1)
-            before=(run/'metrics/metrics.json').read_bytes()
+            before=(run/'metrics_normalized/metrics.json').read_bytes()
             with patch.object(sys,'argv',args+['--report-only']), patch.object(score,'official_group',side_effect=AssertionError('must not rescore')):
                 score.main()
-            self.assertEqual((run/'metrics/metrics.json').read_bytes(),before)
-            self.assertTrue((run/'metrics/SUMMARY.tsv').exists())
+            self.assertEqual((run/'metrics_normalized/metrics.json').read_bytes(),before)
+            self.assertTrue((run/'metrics_normalized/SUMMARY.tsv').exists())
 
 
 if __name__=='__main__':unittest.main()

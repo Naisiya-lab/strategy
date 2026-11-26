@@ -13,6 +13,7 @@ import re
 import sys
 import warnings
 from report import group_order, write_report
+import normalization
 
 ROOT = Path(__file__).resolve().parent
 OFFICIAL = ROOT/'scoring_source'
@@ -127,18 +128,21 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--run',type=Path,default=ROOT/'outputs/full')
     ap.add_argument('--data-root',type=Path)
+    ap.add_argument('--normalization', choices=('v2', 'raw'), default='v2',
+                    help='V2 symmetric representation rules (default), or untouched official scoring')
     ap.add_argument('--workers',type=int,default=4)
     ap.add_argument('--report-only',action='store_true',help='Reformat existing complete metrics.json without recomputing scores')
     args=ap.parse_args()
     if args.workers<1: ap.error('workers must be positive')
     run=args.run.resolve(); manifest=read(run/'manifest.json')
+    metric_dir = 'metrics_normalized' if args.normalization == 'v2' else 'metrics'
     if args.report_only:
-        saved=read(run/'metrics/metrics.json')
+        saved=read(run/metric_dir/'metrics.json')
         if not saved.get('complete'): raise ValueError('Metrics are incomplete; cannot report-only')
         if saved['provenance']['manifest_sha256'] != sha((run/'manifest.json').read_bytes()):
             raise ValueError('Metrics do not belong to this manifest')
-        write_report(saved['groups'],run/'metrics')
-        print('Saved:',run/'metrics/METRICS.md')
+        write_report(saved['groups'],run/metric_dir)
+        print('Saved:',run/metric_dir/'METRICS.md')
         return
     data=args.data_root or Path(manifest['config']['data_root'])
     ann=data/manifest['config']['annotation']; raw=ann.read_bytes()
@@ -162,13 +166,25 @@ def main():
     provenance={'manifest_sha256':sha((run/'manifest.json').read_bytes()),'sources':source_hashes,
                 'script_sha256':sha(Path(__file__).read_bytes()),
                 'dependencies':{k:version(k) for k in ('sacrebleu','apted','Distance','lxml','tqdm')}}
-    out=run/'metrics'; out.mkdir(exist_ok=True)
+    out=run/metric_dir; out.mkdir(exist_ok=True)
     reports=[]
+    audits=[]
+    provenance['annotation_sha256'] = sha(raw)
+    provenance['tables_sha256'] = sha((data/'MMTab-eval_test_tables_23K.json').read_bytes())
+    provenance['predictions_sha256'] = sha(json.dumps(predictions,sort_keys=True,ensure_ascii=False).encode())
+    provenance['normalization'] = args.normalization
+    provenance['normalizer_version'] = normalization.VERSION if args.normalization == 'v2' else None
+    provenance['normalizer_sha256'] = sha(Path(normalization.__file__).read_bytes())
+    provenance['normalization_sources'] = normalization.SOURCE_SHA256
+    provenance['bleu_lowercase'] = False
     for (task,benchmark),items in sorted(groups.items(),key=lambda pair:group_order(pair[0])):
         print('Scoring',task,benchmark,len(items),flush=True)
         report={'task':task,'benchmark':benchmark,'n':len(items),
                 'execution_errors':sum(states[r['question_id']]['status']!='ok' for r in items),
                 'truncated':sum(states[r['question_id']]['finish_reason']=='length' for r in items)}
+        if args.normalization == 'v2':
+            normalized, refs, source_tables, detail = normalization.normalize_group(task,benchmark,items,gold,tables)
+            audits.extend(detail)
         if benchmark=='ToTTo':
             report.update(metrics={},scoring_error='ToTTo test references unavailable; official external evaluation required')
         elif task=='TR':
@@ -190,10 +206,15 @@ def main():
             report['scoring_error']=None
             write(out/'teds_per_sample.json',results)
         else:
-            report.update(official_group(task,benchmark,items,gold,tables))
+            if args.normalization == 'v2':
+                report.update(official_group(task,benchmark,normalized,refs,source_tables))
+            else:
+                report.update(official_group(task,benchmark,items,gold,tables))
         reports.append(report)
         write(out/'metrics.json',{'provenance':provenance,'groups':reports,'complete':False})
     write(out/'metrics.json',{'provenance':provenance,'groups':reports,'complete':True})
+    if args.normalization == 'v2':
+        write(out/'normalization_detail.json', audits)
     write_report(reports,out)
     print('Saved:',out/'METRICS.md',flush=True)
 

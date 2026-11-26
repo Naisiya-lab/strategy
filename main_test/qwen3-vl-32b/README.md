@@ -89,3 +89,10 @@ python -m unittest discover -s . -p 'test_*.py' -v
 ```
 
 模拟请求覆盖断点续跑、空回答、截断、配置冲突与参考答案隔离；评分验证覆盖换行校验、分母及三格式TEDS。
+
+
+## 2026-11-26 评分更新
+
+默认 `bash score.sh` 使用策略进化V2规范化口径，结果写入 `metrics_normalized/`。
+原始口径使用 `bash score.sh --normalization raw`，仍写入 `metrics/`。
+规则、输出和小批评分命令见 [NORMALIZATION.md](NORMALIZATION.md)。

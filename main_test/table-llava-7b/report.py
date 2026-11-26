@@ -59,7 +59,8 @@ def values(reports, columns):
 
 def write_report(reports, out, model='Table-LLaVA-7B'):
     out=Path(out)
-    lines=['# '+model+' MMTab-eval指标','',
+    protocol = 'V2规范化评分' if out.name == 'metrics_normalized' else '原始官方评分'
+    lines=['# '+model+' MMTab-eval指标','', protocol+'。预测和参考对称处理；BLEU保留大小写，TR沿用原始三格式TEDS。','',
            '顺序与指定论文表格一致。Acc、F1、TEDS显示百分数；BLEU保持0–100，保留6位小数。',
            '“—”表示未评测、指标不可用或评分异常，不代表0。ToTTo缺少测试参考答案时不本地评分。','']
     for title,columns,filename in [('TQA / TFV / T2T',QA_COLUMNS,'TQA_TFV_T2T.tsv'),

@@ -72,3 +72,10 @@ bash score.sh --report-only
 环境安装和真实四卡GPU推理尚未在机器2验证。本地测试只验证文件路径、配置隔离、融合长度识别、数据及评分逻辑。
 
 来源：https://github.com/bang123-box/SynTab-LLaVA
+
+
+## 2026-11-26 评分更新
+
+默认 `bash score.sh` 使用策略进化V2规范化口径，结果写入 `metrics_normalized/`。
+原始口径使用 `bash score.sh --normalization raw`，仍写入 `metrics/`。
+规则、输出和小批评分命令见 [NORMALIZATION.md](NORMALIZATION.md)。

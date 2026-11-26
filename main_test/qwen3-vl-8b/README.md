@@ -135,3 +135,10 @@ TR按原题要求分别汇总HTML_TEDS、Markdown_TEDS、LaTeX_TEDS；各自以�
 格式由标注original_query_type决定，不由模型实际回答格式决定；整体TEDS作为JSON辅助字段保留，不替代三列。
 其余官方函数保留原公式，包括RCE对未解析目标的计数局限；分母不是统一的整题数。
 官方函数异常会写入scoring_error并明确标记，不能把空指标当0或声称全部任务已成功评分。
+
+
+## 2026-11-26 评分更新
+
+默认 `bash score.sh` 使用策略进化V2规范化口径，结果写入 `metrics_normalized/`。
+原始口径使用 `bash score.sh --normalization raw`，仍写入 `metrics/`。
+规则、输出和小批评分命令见 [NORMALIZATION.md](NORMALIZATION.md)。

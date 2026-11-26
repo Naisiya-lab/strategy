@@ -69,7 +69,7 @@ class ScoreTest(unittest.TestCase):
                 (run/'samples'/(score.sha(b'a')+'.json')).write_text(json.dumps({
                     'id':'a','status':'ok','answer':'{"answer": ["42"]}','finish_reason':'length'}))
                 score.main()
-            result=json.loads((run/'metrics/metrics.json').read_text())
+            result=json.loads((run/'metrics_normalized/metrics.json').read_text())
             self.assertTrue(result['complete'])
             self.assertEqual(result['groups'][0]['metrics']['Accuracy'],1.0)
             self.assertEqual(result['groups'][0]['truncated'],1)
