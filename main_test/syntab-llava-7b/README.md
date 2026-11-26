@@ -37,10 +37,10 @@ SynTab-LLaVA-v1.5-7B-Conv-Clip/
   config.json
   model-00001-of-00004.safetensors 等
   ConvLLaVA-ConvNeXt-1536/
-  Clip-vit-largr-patch14-336/
+  clip-vit-large-patch14-336/
 ```
 
-注意官方CLIP文件夹拼写为`largr`，不是凭惯例改成large。config.json的highres_vision_path、lowres_vision_path填写真实目录。
+机器2实际CLIP目录为`clip-vit-large-patch14-336`。官方README示例曾写`Clip-vit-largr-patch14-336`，不能照搬为实际路径；Linux区分大小写。config.json的highres_vision_path、lowres_vision_path应填写本机真实目录。
 check要求两个视觉目录包含config.json，低分辨率CLIP还需preprocessor_config.json。
 使用prepared_model中的符号链接和独立配置副本重定向双视觉路径，不改共享原始权重。
 推理强制离线，缺权重不会后台下载。只支持完整模型，检测到adapter_config.json会拒绝启动并说明需要完整checkpoint。
