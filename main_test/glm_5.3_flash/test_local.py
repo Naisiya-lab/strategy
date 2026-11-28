@@ -15,6 +15,24 @@ class Tests(unittest.TestCase):
         self.cfg=json.loads((e.ROOT/'config.json').read_text())
     def raw(self):
         return io.BytesIO(json.dumps({'choices':[{'message':{'content':'42'},'finish_reason':'stop'}],'usage':{'total_tokens':9}}).encode())
+    def test_opaque_image_ids(self):
+        from data import prepare
+        images=self.root/'images';images.mkdir()
+        names=['TabFact_2-15621965-11.html.csv', 'ordinary', 'explicit.png']
+        rows=[]
+        for i,name in enumerate(names):
+            filename=name if name.endswith('.png') else name+'.png'
+            (images/filename).write_bytes(b'image')
+            rows.append({'item_id':str(i),'image_id':name,'input':'question','task_type':'TFV','dataset_name':'TabFact'})
+        (self.root/'ann.json').write_text(json.dumps(rows))
+        selected,_=prepare({'data_root':str(self.root),'annotation':'ann.json'},'full',4)
+        self.assertEqual(len(selected),3)
+        self.assertTrue(selected[0]['image'].endswith('.html.csv.png'))
+        (images/'duplicate').mkdir()
+        (images/'duplicate'/'ordinary.png').write_bytes(b'image')
+        with self.assertRaisesRegex(ValueError,'found 2'):
+            prepare({'data_root':str(self.root),'annotation':'ann.json'},'full',4)
+
     def test_request_parity(self):
         b=e.body_for(self.row,self.cfg)
         self.assertEqual(b['reasoning_effort'],'high');self.assertEqual(b['max_tokens'],8192)

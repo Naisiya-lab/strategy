@@ -59,7 +59,11 @@ def prepare(cfg, mode, per_group):
     for number, r in enumerate(rows, 1):
         if number % 1000 == 0: print(f'Preparing {number}/{len(rows)}', flush=True)
         iid = str(r['image_id'])
-        matches = index.get(Path(iid).stem, [])
+        # Preserve opaque ID suffixes such as .html.csv.
+        image_name = Path(iid).name
+        key = Path(image_name).stem if Path(image_name).suffix.lower() in {
+            '.jpg', '.jpeg', '.png', '.webp', '.bmp'} else image_name
+        matches = index.get(key, [])
         if len(matches) != 1:
             raise ValueError(f'Image {iid}: expected exactly one file, found {len(matches)}')
         p = matches[0]
