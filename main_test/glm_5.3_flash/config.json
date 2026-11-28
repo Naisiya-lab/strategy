@@ -1,0 +1,19 @@
+{
+  "data_root": "/nc1test1/lwj/data/MMTab_eval",
+  "annotation": "MMTab-eval_test_data_49K.json",
+  "endpoint": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+  "model_id": "glm-5.3-flash",
+  "api_key_env": "ZHIPU_API_KEY",
+  "request_options": {
+    "thinking": {
+      "type": "enabled"
+    },
+    "reasoning_effort": "high"
+  },
+  "max_tokens": 8192,
+  "seed": 42,
+  "concurrency": 20,
+  "timeout_seconds": 900,
+  "transport_retries": 4,
+  "smoke_samples": 100
+}
