@@ -1,0 +1,18 @@
+{
+  "data_root": "/nc1test1/lwj/data/MMTab_eval",
+  "annotation": "MMTab-eval_test_data_49K.json",
+  "model_path": "/nc1test1/lwj/strategy/main-test/tabpedia-7b/weights/TabPedia/pretrained.pth",
+  "llm_path": "/nc1test1/lwj/strategy/main-test/tabpedia-7b/components/internlm2-chat-7b",
+  "clip_path": "/nc1test1/lwj/strategy/main-test/tabpedia-7b/components/clip-vit-large-patch14",
+  "donut_path": "/nc1test1/lwj/strategy/main-test/tabpedia-7b/weights/donut-base",
+  "code_path": "/nc1test1/lwj/strategy/main-test/tabpedia-7b/code",
+  "gpu_ids": [
+    "0",
+    "1",
+    "2",
+    "3"
+  ],
+  "seed": 42,
+  "max_tokens": 3000,
+  "repetition_penalty": 1.1
+}
