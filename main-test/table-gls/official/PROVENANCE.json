@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/AAAndy-Zhu/TableVLM",
+  "commit": "9140cb91205f56fd1de4e5ff4716f6d3ab45cf80",
+  "files": {
+    "eval_mmtab_vllm_tablegls_stage1.py": "0bd0a34111815354284a9fa5a9f86fcc644f8182759ef43f0de8ca40ef2aadc7",
+    "eval_mmtab_vllm_tablegls_stage2.py": "fad950dd4ade7611876bdd40e8c694269e6b8f8677a92c726421996341a9021c",
+    "eval_mmtab_vllm_tablegls_stage3.py": "6017c3c4e3acebded44ebf0b0bec1d03592f022aec461ebf7c19ab4e7e265289"
+  }
+}

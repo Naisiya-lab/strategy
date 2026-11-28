@@ -1,0 +1,16 @@
+{
+  "data_root": "/nc1test1/lwj/data/MMTab_eval",
+  "annotation": "MMTab-eval_test_data_49K.json",
+  "model_path": "/nc1test1/lwj/Models/Qwen3-VL-8B-Instruct",
+  "gpus": "0",
+  "tensor_parallel_size": 1,
+  "max_model_len": 32768,
+  "gpu_memory_utilization": 0.8,
+  "max_tokens": [
+    1024,
+    1024,
+    4096
+  ],
+  "temperature": 0,
+  "seed": 42
+}
