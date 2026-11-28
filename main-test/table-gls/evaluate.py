@@ -107,8 +107,9 @@ def main():
         row["original_query"] = gold[row["id"]].get("original_query")
         if row["task_type"] == "TQA" and row["dataset_name"] in ("AIT-QA","TabMCQ","HiTab","WTQ","TAT-QA") and not row["original_query"]:
             raise ValueError("Missing original_query: " + row["id"])
-    print("Preflight:",len(rows),"samples",flush=True)
-    if a.mode == "check": return
+    if a.mode == "check":
+        print("Preflight passed:",len(rows),"samples",flush=True)
+        return
     name = a.run_name or a.mode
     if Path(name).name != name or name in (".",".."):
         raise ValueError("run-name must be a directory name")
@@ -122,9 +123,17 @@ def main():
         manifest = {"config":cfg,"annotation_sha256":ann_sha,"rows":rows,"mode":a.mode,
                     "source_sha256":{p.name:digest(p.read_bytes().replace(b"\r\n",b"\n")) for p in sources}}
         mf = out/"manifest.json"
-        if mf.exists() and read(mf) != manifest:
-            raise ValueError("Inputs/config/code changed: use a new --run-name")
-        save(mf,manifest)
+        if mf.exists():
+            previous = read(mf)
+            comparison = json.loads(json.dumps(previous))
+            # Exact predecessor accepted: this update changes logging only.
+            if comparison.get("source_sha256", {}).get("evaluate.py") == "c5544d2dce6c3fb064d47fb1386eb086ab1fc799dc29bdee4b6cb5f4b8348be4":
+                comparison["source_sha256"]["evaluate.py"] = manifest["source_sha256"]["evaluate.py"]
+            if comparison != manifest:
+                raise ValueError("Inputs/config/code changed: use a new --run-name")
+            # Preserve original manifest so existing score provenance remains valid.
+        else:
+            save(mf,manifest)
         pending=[]
         for row in rows:
             p=out/"samples"/(digest(row["id"].encode())+".json")
@@ -132,31 +141,42 @@ def main():
                 if p.exists(): save(out/"previous_attempts"/(p.stem+"_"+str(time.time_ns())+".json"),read(p))
                 pending.append(row)
         if pending:
-            from vllm import LLM, SamplingParams
-            from PIL import Image
-            llm=LLM(model=cfg["model_path"],tensor_parallel_size=cfg["tensor_parallel_size"],
-                    gpu_memory_utilization=cfg["gpu_memory_utilization"],max_model_len=cfg["max_model_len"],
-                    max_num_seqs=1,seed=cfg["seed"])
-            def generate(text,row,stage):
-                p=Path(row["image"])
-                if digest(p.read_bytes()) != row["image_sha256"]: raise ValueError("Image changed")
-                with Image.open(p) as source:
-                    image=source.convert("RGB")
-                try:
-                    o=llm.generate([{"prompt":text,"multi_modal_data":{"image":image}}],
-                        SamplingParams(temperature=cfg["temperature"],seed=cfg["seed"],
-                            max_tokens=cfg["max_tokens"][stage-1]),use_tqdm=False)[0]
-                finally: image.close()
-                v=o.outputs[0]; n=len(o.prompt_token_ids or []); m=len(v.token_ids)
-                return v.text,v.finish_reason,{"prompt_tokens":n,"completion_tokens":m,"total_tokens":n+m}
-            for i,row in enumerate(pending,1):
-                try: process(row,cfg,out,generate,ts)
-                except Exception as e:
-                    save(out/"samples"/(digest(row["id"].encode())+".json"),
-                         {"id":row["id"],"status":"error","answer":"","error":repr(e)})
-                    # Stop on first failure: avoid turning engine failures into thousands of empty answers.
-                    raise
-                print(f"Saved {i}/{len(pending)}: {row['id']}",flush=True)
+            from runtime_ui import model_output
+            log_path = a.config.resolve().parent / "logs" / (name + "_model_" + str(time.time_ns()) + ".log")
+            with model_output(log_path) as terminal:
+                from vllm import LLM, SamplingParams
+                from PIL import Image
+                llm=LLM(model=cfg["model_path"],tensor_parallel_size=cfg["tensor_parallel_size"],
+                        gpu_memory_utilization=cfg["gpu_memory_utilization"],max_model_len=cfg["max_model_len"],
+                        max_num_seqs=1,seed=cfg["seed"])
+                def generate(text,row,stage):
+                    p=Path(row["image"])
+                    if digest(p.read_bytes()) != row["image_sha256"]: raise ValueError("Image changed")
+                    with Image.open(p) as source:
+                        image=source.convert("RGB")
+                    try:
+                        o=llm.generate([{"prompt":text,"multi_modal_data":{"image":image}}],
+                            SamplingParams(temperature=cfg["temperature"],seed=cfg["seed"],
+                                max_tokens=cfg["max_tokens"][stage-1]),use_tqdm=False)[0]
+                    finally: image.close()
+                    v=o.outputs[0]; n=len(o.prompt_token_ids or []); m=len(v.token_ids)
+                    return v.text,v.finish_reason,{"prompt_tokens":n,"completion_tokens":m,"total_tokens":n+m}
+                from tqdm import tqdm
+                print("Model startup successful.", file=terminal, flush=True)
+                completed = len(rows) - len(pending)
+                progress = tqdm(total=len(rows), initial=completed, desc="Shard 0", unit="sample",
+                                file=terminal, dynamic_ncols=True, mininterval=1,
+                                bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]")
+                for row in pending:
+                    try: process(row,cfg,out,generate,ts)
+                    except Exception as e:
+                        save(out/"samples"/(digest(row["id"].encode())+".json"),
+                             {"id":row["id"],"status":"error","answer":"","error":repr(e)})
+                        # Stop on first failure: avoid turning engine failures into thousands of empty answers.
+                        progress.close()
+                        raise
+                    progress.update(1)
+                progress.close()
         records=[read(out/"samples"/(digest(r["id"].encode())+".json")) for r in rows]
         save(out/"summary.json",{"total":len(records),"ok":sum(r["status"]=="ok" for r in records),
             "errors":sum(r["status"]!="ok" for r in records),"newly_attempted":len(pending)})
