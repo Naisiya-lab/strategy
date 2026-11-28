@@ -72,5 +72,3 @@ def prepare(cfg, mode, per_group):
                          'question': r['input'], 'task_type': r['task_type'],
                          'dataset_name': r['dataset_name']})
     return prepared, digest(data)
-
-
