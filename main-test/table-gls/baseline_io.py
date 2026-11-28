@@ -67,7 +67,10 @@ def prepare(cfg, mode, per_group):
     prepared = []
     for r in rows:
         iid = str(r['image_id'])
-        matches = index.get(Path(iid).stem, [])
+        # .csv/.html are part of the table ID, not image extensions.
+        image_id = Path(iid)
+        key = image_id.stem if image_id.suffix.lower() in {'.jpg', '.jpeg', '.png', '.webp', '.bmp'} else image_id.name
+        matches = index.get(key, [])
         if len(matches) != 1:
             raise ValueError(f'Image {iid}: expected exactly one file, found {len(matches)}')
         p = matches[0]
