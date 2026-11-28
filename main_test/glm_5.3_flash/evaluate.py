@@ -86,7 +86,11 @@ def infer(row, cfg, key, gate):
                 if attempt == cfg['transport_retries']: raise RuntimeError('Network retries exhausted') from None
                 gate.stop.wait(retry_delay(None,attempt))
     except Exception as exc:
-        record['error'] = str(exc).replace(key, '[REDACTED]') if key else str(exc)
+        # Exception repr can escape control characters and expose credentials.
+        # Never persist arbitrary exception text from request construction.
+        record['error'] = 'Request failed: ' + type(exc).__name__
+        if isinstance(exc, RuntimeError) and str(exc).startswith(('HTTP ', 'Network retries', 'Stopped before')):
+            record['error'] = str(exc)
     record['seconds'] = time.monotonic()-started
     return record
 
@@ -120,8 +124,10 @@ def main():
     if not 1 <= workers <= 50: ap.error('Concurrency must be 1..50')
     name=args.run_name or args.mode
     if Path(name).name!=name or name in ('.','..'): ap.error('Invalid run name')
-    key=os.environ.get(cfg['api_key_env'],'').strip()
+    key=os.environ.get(cfg['api_key_env'],'')
     if args.mode!='check' and not key: ap.error('Set '+cfg['api_key_env']+' first')
+    if args.mode!='check' and (not key.isascii() or any(c.isspace() or ord(c)<33 or ord(c)==127 for c in key)):
+        ap.error('Invalid API key: whitespace/control/non-ASCII characters. Re-enter the key only.')
     if args.mode=='check':
         rows,_=prepare(cfg,'full',4);print('Validated',len(rows),'samples');return 0
     out=ROOT/'outputs'/name;out.mkdir(parents=True,exist_ok=True)

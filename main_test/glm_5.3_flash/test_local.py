@@ -33,6 +33,14 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'found 2'):
             prepare({'data_root':str(self.root),'annotation':'ann.json'},'full',4)
 
+    def test_header_error_does_not_leak_key(self):
+        key='prefix\rsecret'
+        with patch.object(e.urllib.request,'urlopen',side_effect=ValueError("Invalid header value " + repr(key))):
+            result=e.infer(self.row,self.cfg,key,e.Gate())
+        self.assertNotIn('secret',json.dumps(result))
+        self.assertNotIn('prefix',json.dumps(result))
+        self.assertEqual(result['status'],'error')
+
     def test_request_parity(self):
         b=e.body_for(self.row,self.cfg)
         self.assertEqual(b['reasoning_effort'],'high');self.assertEqual(b['max_tokens'],8192)
