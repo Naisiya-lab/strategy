@@ -31,7 +31,7 @@ def templates():
     return result
 
 def prompt(stage, row, prior, ts):
-    ds = row["dataset_name"]
+    ds = row["dataset_name"] if row["task_type"] == "TQA" else "__task__"
     question_sets = ("AIT-QA", "TabMCQ", "HiTab", "WTQ", "TAT-QA")
     if stage < 3:
         kw = {}
@@ -105,7 +105,7 @@ def main():
     ts = templates()
     for row in rows:
         row["original_query"] = gold[row["id"]].get("original_query")
-        if row["dataset_name"] in ("AIT-QA","TabMCQ","HiTab","WTQ","TAT-QA") and not row["original_query"]:
+        if row["task_type"] == "TQA" and row["dataset_name"] in ("AIT-QA","TabMCQ","HiTab","WTQ","TAT-QA") and not row["original_query"]:
             raise ValueError("Missing original_query: " + row["id"])
     print("Preflight:",len(rows),"samples",flush=True)
     if a.mode == "check": return

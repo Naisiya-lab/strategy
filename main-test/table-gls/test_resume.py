@@ -4,7 +4,7 @@ import evaluate as e
 
 class ResumeTests(unittest.TestCase):
  def test_resume_after_stage_two_failure(self):
-  row={"id":"a","dataset_name":"WTQ","original_query":"Which?","question":"Which?"}
+  row={"task_type":"TQA","id":"a","dataset_name":"WTQ","original_query":"Which?","question":"Which?"}
   ts=e.templates(); calls=[]
   def broken(text,row,stage):
    calls.append(stage)
@@ -33,7 +33,7 @@ class ResumeTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    previous=Path(d)/'previous.jsonl'
    for ds in ['AIT-QA','TabMCQ','WTQ','HiTab','TAT-QA','TabFact','TabMWP','FeTaQA']:
-    row={'id':'a','image_id':'image','question':'Task e.g., x','original_query':'Question?','dataset_name':ds}
+    row={'task_type':'TQA','id':'a','image_id':'image','question':'Task e.g., x','original_query':'Question?','dataset_name':ds}
     sample=dict(row,item_id='a',input=row['question'])
     for stage in (1,2,3):
      prior='```json\n{"thought":"x"}\n```' if stage==2 else 'Plan Evaluation: ok\nSub-table: x'
