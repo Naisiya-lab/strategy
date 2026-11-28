@@ -13,9 +13,11 @@ import threading
 import time
 import urllib.request
 import urllib.error
+from tqdm import tqdm
 from data import prepare, digest, save
 
 ROOT = Path(__file__).resolve().parent
+LEGACY_PROGRESS_HASHES = ['a3b1fce2412eaf43c1aadf2189f36b4542741512b6ef6647e3fdf5db67ffa106', 'f25a283a549f88d7976ee9522df1ce28674b45f793489ae9e4cd55e36767944a']
 
 class Gate:
     def __init__(self):
@@ -140,9 +142,16 @@ def main():
         manifest={'config':semantic,'annotation_sha256':source_hash,'mode':args.mode,'rows':rows,
                   'script_sha256':digest(Path(__file__).read_bytes()),'data_script_sha256':digest((ROOT/'data.py').read_bytes())}
         mf=out/'manifest.json'
-        if mf.exists() and json.loads(mf.read_text(encoding='utf8'))!=manifest: raise ValueError('Inputs/code changed; use new --run-name')
-        save(mf,manifest)
-        save(out/'session.json',{'concurrency':workers,'timeout_seconds':cfg['timeout_seconds'],'transport_retries':cfg['transport_retries']})
+        if mf.exists():
+            previous=json.loads(mf.read_text(encoding='utf8'))
+            comparable=dict(previous)
+            # Only the verified pre-tqdm runner is compatible; keep original provenance.
+            if comparable.get('script_sha256') in LEGACY_PROGRESS_HASHES:
+                comparable['script_sha256']=manifest['script_sha256']
+            if comparable != manifest: raise ValueError('Inputs/code changed; use new --run-name')
+        else:
+            save(mf,manifest)
+        save(out/'session.json',{'script_sha256':digest(Path(__file__).read_bytes()),'concurrency':workers,'timeout_seconds':cfg['timeout_seconds'],'transport_retries':cfg['transport_retries']})
         def target(row): return out/'samples'/(digest(row['id'].encode())+'.json')
         pending=[]
         for row in rows:
@@ -154,20 +163,30 @@ def main():
             if p.exists(): save(out/'previous_attempts'/(p.stem+'_'+str(time.time_ns())+'.json'),json.loads(p.read_text(encoding='utf8')))
             record=infer(row,cfg,key,gate);save(p,record);return record
         pool=ThreadPoolExecutor(max_workers=workers);futures=set();iterator=iter(pending);done=0
+        progress=tqdm(total=len(pending), desc='GLM inference', unit='sample',
+                      ascii=True, dynamic_ncols=True, mininterval=0.5,
+                      bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}')
+        successes=errors=0
         def submit():
             row=next(iterator,None)
             if row is not None: futures.add(pool.submit(process,row))
         try:
             for _ in range(min(workers,len(pending))): submit()
             while futures:
-                finished,_=wait(futures,return_when=FIRST_COMPLETED)
+                finished,_=wait(futures,timeout=1,return_when=FIRST_COMPLETED)
+                if not finished: progress.refresh()
                 for future in finished:
                     futures.remove(future);r=future.result();done+=1
-                    print(f'{done}/{len(pending)} | {r["status"]} | {r["id"]}',flush=True)
+                    successes += r['status']=='ok'
+                    errors += r['status']!='ok'
+                    progress.set_postfix(ok=successes, errors=errors, workers=workers, refresh=False)
+                    progress.update(1)
                     if not gate.stop.is_set(): submit()
         except KeyboardInterrupt:
-            code=130;gate.stop.set();print('Stopping; saving in-flight responses...',flush=True)
-        finally: pool.shutdown(wait=True)
+            code=130;gate.stop.set();tqdm.write('Stopping; saving in-flight responses...')
+        finally:
+            pool.shutdown(wait=True)
+            progress.close()
         summary=export(out,rows);print(json.dumps(summary,indent=2))
         return code or (1 if summary['errors'] or summary['pending'] else 0)
     finally: lock.unlink(missing_ok=True)

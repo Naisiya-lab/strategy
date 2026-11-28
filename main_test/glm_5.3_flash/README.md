@@ -4,11 +4,12 @@ Direct original image + original question; no gold tables/answers, strategy memo
 
 ## Machine 2
 
-Python >=3.10, standard library only for inference. No GPU or model installation needed.
+Python >=3.10, tqdm for inference progress. No GPU or model installation needed.
 Data: /nc1test1/lwj/data/MMTab_eval (same as Qwen); annotation MMTab-eval_test_data_49K.json; images/; scoring also needs MMTab-eval_test_tables_23K.json.
 
 ```bash
 cd /nc1test1/lwj/strategy/main_test/glm_5.3_flash
+python -m pip install -r requirements.txt
 read -rsp 'ZHIPU_API_KEY: ' ZHIPU_API_KEY; echo
 export ZHIPU_API_KEY
 bash test.sh smoke --concurrency 20
@@ -19,7 +20,7 @@ bash score.sh
 
 Smoke selects up to 100 samples deterministically across task/dataset groups. Full uses every annotation ID, including OOD and ToTTo. ToTTo without references is reported unscored. Full and smoke are independent and do not reuse each other's results. Preflight scans images and verifies hashes, printing progress every 1000 rows. `bash test.sh check` is optional and makes no API calls.
 
-Inference prints each completion, saves raw responses (including reasoning if returned), token usage and elapsed time under outputs/<mode>/samples, then exports predictions.jsonl and summary.json. Protect these local results as research data; outputs and credentials are excluded from Git.
+Inference displays an ASCII tqdm bar with elapsed time, ETA, throughput and session success/error counts, saves raw responses (including reasoning if returned), token usage and elapsed time under outputs/<mode>/samples, then exports predictions.jsonl and summary.json. Protect these local results as research data; outputs and credentials are excluded from Git.
 
 Default concurrency 20; pass --concurrency 30 or 40 after checking service stability. Accepted range 1–50 is a per-process limit; other experiments share the account quota. This runner does not automatically increase concurrency. HTTP 429/temporary server errors use a shared cooldown, Retry-After (seconds or HTTP date), exponential backoff/jitter otherwise, with four retries. Persistent authentication/request errors stop new submissions. There is no automatic semantic regeneration. Nonempty truncated answers are retained and flagged, empty responses are errors. Timeout retries may incur repeated billing; reported usage may be incomplete.
 

@@ -63,9 +63,14 @@ class Tests(unittest.TestCase):
         with patch.object(e,'ROOT',self.root),patch.object(e,'prepare',return_value=([self.row],'hash')),patch.dict(e.os.environ,{'ZHIPU_API_KEY':'secret'}):
             with patch('sys.argv',args),patch.object(e.urllib.request,'urlopen',return_value=self.raw()) as api:
                 self.assertEqual(e.main(),0);self.assertEqual(api.call_count,1)
+            mf=self.root/'outputs/full/manifest.json'
+            previous=json.loads(mf.read_text())
+            previous['script_sha256']=e.LEGACY_PROGRESS_HASHES[0]
+            mf.write_text(json.dumps(previous))
             with patch('sys.argv',args+['--concurrency','30']),patch.object(e.urllib.request,'urlopen') as api:
                 self.assertEqual(e.main(),0);api.assert_not_called()
             manifest=json.loads((self.root/'outputs/full/manifest.json').read_text())
+            self.assertEqual(manifest['script_sha256'],e.LEGACY_PROGRESS_HASHES[0])
             self.assertNotIn('secret',str(manifest));self.assertEqual(manifest['rows'][0]['id'],'one')
     def test_empty_response_is_error(self):
         raw=io.BytesIO(b'{"choices":[{"message":{"content":""},"finish_reason":"length"}]}')
