@@ -1,0 +1,6 @@
+__pycache__/
+outputs/
+code/
+weights/
+downloads/
+*.tmp

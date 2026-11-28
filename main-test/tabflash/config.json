@@ -1,0 +1,15 @@
+{
+  "data_root": "/nc1test1/lwj/data/MMTab_eval",
+  "annotation": "MMTab-eval_test_data_49K.json",
+  "model_path": "/nc1test1/lwj/strategy/main-test/tabflash/weights/both_lora_qcond_progressive_1_kl_2e-4_continue_1epoch_4b_merged",
+  "source_dir": "/nc1test1/lwj/strategy/main-test/tabflash/code/InternVL/internvl_chat",
+  "model_name": "InternVL2_5-4B",
+  "gpu_ids": ["0", "1", "2", "3"],
+  "seed": 42,
+  "max_tokens": 1024,
+  "max_dynamic_patch": 12,
+  "drop_rate": 0.3,
+  "drop_method": "bottomk",
+  "q_cond_off": false,
+  "prune_norm_layer_idx": -1
+}
