@@ -1,0 +1,12 @@
+{
+  "data_root": "/nc1test1/lwj/data/MMTab_eval",
+  "annotation": "MMTab-eval_test_data_49K.json",
+  "model_path": "/nc1test1/lwj/strategy/main-test/refocus/weights/lr1e-06_ep2_bb1_edit0_aug0",
+  "code_revision": null,
+  "gpu_ids": [
+    "0"
+  ],
+  "seed": 42,
+  "max_tokens": 8192,
+  "num_crops": 16
+}
