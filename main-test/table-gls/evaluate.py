@@ -119,7 +119,7 @@ def main():
     import fcntl
     with (out/".lock").open("a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        sources = [Path(__file__), ROOT/"baseline_io.py", ROOT/"normalization.py", *sorted((ROOT/"official").glob("*.py"))]
+        sources = [Path(__file__), ROOT/"baseline_io.py", ROOT/"normalization.py", ROOT/"shard_runner.py", *sorted((ROOT/"official").glob("*.py"))]
         manifest = {"config":cfg,"annotation_sha256":ann_sha,"rows":rows,"mode":a.mode,
                     "source_sha256":{p.name:digest(p.read_bytes().replace(b"\r\n",b"\n")) for p in sources}}
         mf = out/"manifest.json"
@@ -127,8 +127,12 @@ def main():
             previous = read(mf)
             comparison = json.loads(json.dumps(previous))
             # Exact predecessor accepted: this update changes logging only.
-            if comparison.get("source_sha256", {}).get("evaluate.py") == "c5544d2dce6c3fb064d47fb1386eb086ab1fc799dc29bdee4b6cb5f4b8348be4":
+            if comparison.get("source_sha256", {}).get("evaluate.py") in ("c5544d2dce6c3fb064d47fb1386eb086ab1fc799dc29bdee4b6cb5f4b8348be4", "8761c6a51c58551edfb1c8e56a06f532f7a64865d64c5ec5fdaeabbee16e1167"):
                 comparison["source_sha256"]["evaluate.py"] = manifest["source_sha256"]["evaluate.py"]
+                comparison["source_sha256"]["shard_runner.py"] = manifest["source_sha256"]["shard_runner.py"]
+            # GPU group assignment changes execution placement only.
+            comparison["config"]["gpu_groups"] = comparison["config"].get("gpu_groups", manifest["config"].get("gpu_groups"))
+            if "gpu_groups" not in manifest["config"]: comparison["config"].pop("gpu_groups", None)
             if comparison != manifest:
                 raise ValueError("Inputs/config/code changed: use a new --run-name")
             # Preserve original manifest so existing score provenance remains valid.
@@ -141,42 +145,8 @@ def main():
                 if p.exists(): save(out/"previous_attempts"/(p.stem+"_"+str(time.time_ns())+".json"),read(p))
                 pending.append(row)
         if pending:
-            from runtime_ui import model_output
-            log_path = a.config.resolve().parent / "logs" / (name + "_model_" + str(time.time_ns()) + ".log")
-            with model_output(log_path) as terminal:
-                from vllm import LLM, SamplingParams
-                from PIL import Image
-                llm=LLM(model=cfg["model_path"],tensor_parallel_size=cfg["tensor_parallel_size"],
-                        gpu_memory_utilization=cfg["gpu_memory_utilization"],max_model_len=cfg["max_model_len"],
-                        max_num_seqs=1,seed=cfg["seed"])
-                def generate(text,row,stage):
-                    p=Path(row["image"])
-                    if digest(p.read_bytes()) != row["image_sha256"]: raise ValueError("Image changed")
-                    with Image.open(p) as source:
-                        image=source.convert("RGB")
-                    try:
-                        o=llm.generate([{"prompt":text,"multi_modal_data":{"image":image}}],
-                            SamplingParams(temperature=cfg["temperature"],seed=cfg["seed"],
-                                max_tokens=cfg["max_tokens"][stage-1]),use_tqdm=False)[0]
-                    finally: image.close()
-                    v=o.outputs[0]; n=len(o.prompt_token_ids or []); m=len(v.token_ids)
-                    return v.text,v.finish_reason,{"prompt_tokens":n,"completion_tokens":m,"total_tokens":n+m}
-                from tqdm import tqdm
-                print("Model startup successful.", file=terminal, flush=True)
-                completed = len(rows) - len(pending)
-                progress = tqdm(total=len(rows), initial=completed, desc="Shard 0", unit="sample",
-                                file=terminal, dynamic_ncols=True, mininterval=1,
-                                bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]")
-                for row in pending:
-                    try: process(row,cfg,out,generate,ts)
-                    except Exception as e:
-                        save(out/"samples"/(digest(row["id"].encode())+".json"),
-                             {"id":row["id"],"status":"error","answer":"","error":repr(e)})
-                        # Stop on first failure: avoid turning engine failures into thousands of empty answers.
-                        progress.close()
-                        raise
-                    progress.update(1)
-                progress.close()
+            from shard_runner import run_shards
+            run_shards(cfg, rows, pending, out, a.config.resolve().parent / "logs", name)
         records=[read(out/"samples"/(digest(r["id"].encode())+".json")) for r in rows]
         save(out/"summary.json",{"total":len(records),"ok":sum(r["status"]=="ok" for r in records),
             "errors":sum(r["status"]!="ok" for r in records),"newly_attempted":len(pending)})
